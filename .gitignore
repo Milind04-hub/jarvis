@@ -1,0 +1,17 @@
+# secrets — never commit
+spotify_config.json
+.spotify_cache
+.cache
+
+# environment & caches
+.venv/
+__pycache__/
+*.pyc
+.brain_workspace/
+.claude/
+
+# large / personal data
+voices/
+recordings/
+usage.json
+*.pdf

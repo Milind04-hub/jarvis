@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#bfe3ff"/>
+      <stop offset="45%" stop-color="#58a6ff"/>
+      <stop offset="100%" stop-color="#0d1117"/>
+    </radialGradient>
+  </defs>
+  <!-- arc-reactor style core -->
+  <circle cx="32" cy="32" r="30" fill="#0d1117"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#1f6feb" stroke-width="2" opacity="0.55"/>
+  <circle cx="32" cy="32" r="19" fill="none" stroke="#58a6ff" stroke-width="2.5" opacity="0.8"/>
+  <!-- segmented ring -->
+  <g stroke="#9ecbff" stroke-width="4" opacity="0.9">
+    <line x1="32" y1="9.5" x2="32" y2="15.5"/>
+    <line x1="32" y1="48.5" x2="32" y2="54.5"/>
+    <line x1="9.5" y1="32" x2="15.5" y2="32"/>
+    <line x1="48.5" y1="32" x2="54.5" y2="32"/>
+    <line x1="16.1" y1="16.1" x2="20.3" y2="20.3"/>
+    <line x1="43.7" y1="43.7" x2="47.9" y2="47.9"/>
+    <line x1="47.9" y1="16.1" x2="43.7" y2="20.3"/>
+    <line x1="20.3" y1="43.7" x2="16.1" y2="47.9"/>
+  </g>
+  <circle cx="32" cy="32" r="11" fill="url(#glow)"/>
+  <circle cx="32" cy="32" r="11" fill="none" stroke="#bfe3ff" stroke-width="1.5" opacity="0.9"/>
+</svg>

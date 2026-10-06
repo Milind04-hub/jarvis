@@ -1,0 +1,16 @@
+openwakeword
+sounddevice
+numpy
+faster-whisper
+piper-tts
+flask
+pystray
+pillow
+pywebview
+ddgs
+yt-dlp
+fpdf2
+spotipy
+# GPU Whisper (optional, NVIDIA only)
+nvidia-cublas-cu12
+nvidia-cudnn-cu12

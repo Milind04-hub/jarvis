@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jarvis</title>
+<link rel="icon" type="image/svg+xml" href="/static/icon.svg">
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff; --gold: #d29922;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.5 "Segoe UI", system-ui, sans-serif; padding: 24px; max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 22px; letter-spacing: 2px; margin-bottom: 4px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin-bottom: 12px; }
+  .full { grid-column: 1 / -1; }
+  #status { display: flex; align-items: center; gap: 10px; font-size: 18px; }
+  #dot { width: 12px; height: 12px; border-radius: 50%; background: #3fb950; }
+  #dot.recording, #dot.speaking { background: #f85149; }
+  #dot.thinking, #dot.transcribing { background: var(--gold); }
+  #dot.starting { background: var(--dim); }
+  #dot.muted { background: #f85149; }
+  #muteBtn.muted { background: #f8514922; border-color: #f85149; color: #f85149; }
+  .pulse { animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  select, button { background: #21262d; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 14px; width: 100%; }
+  label { font-size: 12px; color: var(--dim); display: block; margin: 10px 0 4px; }
+  #log { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .msg { padding: 8px 12px; border-radius: 8px; max-width: 85%; }
+  .you { background: #1f6feb33; align-self: flex-end; }
+  .jarvis { background: #21262d; align-self: flex-start; }
+  .msg .who { font-size: 11px; color: var(--dim); margin-bottom: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: right; padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--dim); font-weight: normal; }
+  .note { font-size: 12px; color: var(--dim); margin-top: 8px; }
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+  <h1 style="display:flex;align-items:center;gap:12px"><img src="/static/icon.svg" width="34" height="34" alt="">J A R V I S</h1>
+  <div class="sub">local voice assistant</div>
+
+  <div class="grid">
+    <div class="panel full" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div id="status"><div id="dot"></div><span id="statusText">connecting...</span></div>
+      <button id="muteBtn" style="width:auto;padding:8px 18px"></button>
+    </div>
+
+    <div class="panel">
+      <h2>Brain</h2>
+      <label>Active backend</label>
+      <select id="backend">
+        <option value="ollama">Ollama (local, fast, free)</option>
+        <option value="claude_code">Claude (Pro subscription, smarter)</option>
+      </select>
+      <label>Ollama model</label>
+      <select id="ollamaModel"></select>
+      <label>Claude model</label>
+      <select id="claudeModel">
+        <option value="haiku">Haiku (fastest)</option>
+        <option value="sonnet">Sonnet (balanced)</option>
+        <option value="opus">Opus (smartest)</option>
+      </select>
+      <div class="note">Changes apply to the next question. The other backend stays on standby as fallback.</div>
+    </div>
+
+    <div class="panel">
+      <h2>Usage</h2>
+      <table id="usageTable">
+        <thead><tr><th>Backend</th><th>Requests</th><th>Tokens in</th><th>Tokens out</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <label>Period</label>
+      <select id="period">
+        <option value="today">Today</option>
+        <option value="week">Last 7 days</option>
+        <option value="all_time">All time</option>
+      </select>
+      <div class="note">Claude usage counts against your Pro plan's limits (shared with claude.ai chats, resets every 5 hours). Ollama is free and unlimited.</div>
+    </div>
+
+    <div class="panel full">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <h2 style="margin-bottom:0">Conversation</h2>
+        <button id="exportBtn" style="width:auto;padding:6px 14px;font-size:13px">⬇ Export PDF</button>
+      </div>
+      <div id="log" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+let settingsDirty = false;
+let usageData = null;
+let muted = false;
+
+$("muteBtn") && ($("muteBtn").onclick = async () => {
+  await fetch("/api/mute", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ muted: !muted })
+  });
+  refreshState();
+});
+
+async function refreshState() {
+  try {
+    const s = await (await fetch("/api/state")).json();
+    $("dot").className = s.status + (["recording","thinking","transcribing","speaking"].includes(s.status) ? " pulse" : "");
+    $("statusText").textContent = {
+      starting: "Starting up...", listening: "Listening for “hey jarvis”",
+      recording: "Recording — speak now", transcribing: "Transcribing...",
+      thinking: "Thinking...", speaking: "Speaking...",
+      muted: "Muted — not listening"
+    }[s.status] || s.status;
+    muted = s.muted;
+    $("muteBtn").textContent = muted ? "🔇 Unmute" : "🎙️ Mute";
+    $("muteBtn").className = muted ? "muted" : "";
+
+    if (!settingsDirty) {
+      $("backend").value = s.settings.backend;
+      $("claudeModel").value = s.settings.claude_model;
+      if ($("ollamaModel").options.length) $("ollamaModel").value = s.settings.ollama_model;
+    }
+
+    const log = $("log");
+    log.innerHTML = s.log.map(e =>
+      `<div class="msg ${e.role}"><div class="who">${e.role === "you" ? "You" : "Jarvis"}</div>${e.text.replace(/</g,"&lt;")}</div>`
+    ).join("");
+    log.scrollTop = log.scrollHeight;
+  } catch {}
+}
+
+async function refreshUsage() {
+  try { usageData = await (await fetch("/api/usage")).json(); renderUsage(); } catch {}
+}
+
+function renderUsage() {
+  if (!usageData) return;
+  const bucket = usageData[$("period").value] || {};
+  const rows = Object.entries(bucket).map(([b, v]) =>
+    `<tr><td>${b}</td><td>${v.requests}</td><td>${v.in.toLocaleString()}</td><td>${v.out.toLocaleString()}</td></tr>`);
+  $("usageTable").querySelector("tbody").innerHTML =
+    rows.length ? rows.join("") : `<tr><td colspan="4" style="text-align:center;color:var(--dim)">no usage yet</td></tr>`;
+}
+
+async function loadOllamaModels() {
+  const models = await (await fetch("/api/ollama_models")).json();
+  $("ollamaModel").innerHTML = models.map(m => `<option>${m}</option>`).join("");
+}
+
+async function saveSettings() {
+  settingsDirty = true;
+  await fetch("/api/settings", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      backend: $("backend").value,
+      ollama_model: $("ollamaModel").value,
+      claude_model: $("claudeModel").value,
+    })
+  });
+  settingsDirty = false;
+}
+
+["backend", "ollamaModel", "claudeModel"].forEach(id => $(id).onchange = saveSettings);
+$("period").onchange = renderUsage;
+$("exportBtn").onclick = () => window.open("/api/export_pdf", "_blank");
+
+loadOllamaModels();
+refreshState(); refreshUsage();
+setInterval(refreshState, 1000);
+setInterval(refreshUsage, 5000);
+</script>
+</body>
+</html>
